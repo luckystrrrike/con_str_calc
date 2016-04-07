@@ -1,10 +1,24 @@
-#include "stack.h"
 #include <string.h>
+#include "stack.h"
 
-Stack* createEmptyStack()
+static void resize(Stack* st);
+
+Stack* createEmptyStack(void)
 {
-	Stack* st = (Stack*)malloc(sizeof(Stack));
-	st->data = (ValType*)malloc(sizeof(ValType)*ELEMENTARY_SIZE_STACK);
+	Stack* st = malloc(sizeof(Stack));
+	/* Allocate error checking */
+	if (st == NULL) {
+		printf(MSG_MALLOC);
+		exit(EXIT_FAILURE);
+	}
+
+	st->data = malloc(sizeof(double)*ELEMENTARY_SIZE_STACK);
+	/* Allocate error checking */
+	if (st->data == NULL) {
+		printf(MSG_MALLOC);
+		exit(EXIT_FAILURE);
+	}
+
 	st->max = ELEMENTARY_SIZE_STACK; 
 	st->size = 0;
 	return st;
@@ -14,23 +28,26 @@ void deleteStack(Stack* st)
 {
 	free(st->data);
 	free(st);
-	st = NULL;
 }
 
 static void resize(Stack* st)
 {
 	st->max += RESIZE_ADDING;
-	st->data = realloc(st->data, st->max*sizeof(ValType));
+	st->data = realloc(st->data, st->max*sizeof(double));
+	if (st->data == NULL) {
+		printf(MSG_REALLOC);
+		exit(EXIT_FAILURE);
+	}
 }
 
-void push(Stack* st, ValType val)
+void push(Stack* st, double val)
 {
 	if (st->size == st->max)
 		resize(st);
 	st->data[st->size++] = val;
 }
 
-ValType pop(Stack* st)
+double pop(Stack* st)
 {
 	if (!st->size) { // if there is a request to pop the value from empty stack
 		printf("ERROR (FUNCTION POP): STACK SIZE < 0\n");
@@ -41,7 +58,7 @@ ValType pop(Stack* st)
 }
 
 /* In this function just look to the top of the stack */
-ValType peek(Stack* st)
+double peek(Stack* st)
 {
 	if (!st->size) { // if there is a request to pop the value from empty stack
 		printf("ERROR (FUNCTION PEEK): STACK SIZE < 0\n");
@@ -50,9 +67,12 @@ ValType peek(Stack* st)
 	return st->data[st->size-1];
 }
 
+#ifdef DEBUG
 void printStack(Stack* st)
 {
 	int i;
 	for (i = 0; i < st->size; i++)
-		printf("%f ",st->data[i]);
+		printf("%lf",st->data[i]);
+	printf("\n");
 }
+#endif

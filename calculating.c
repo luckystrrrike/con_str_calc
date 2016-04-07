@@ -1,7 +1,23 @@
-#include "calculating.h"
-#include "stack.h"
 #include <stdio.h>
 #include <math.h>
+#include <memory.h>
+#include "calculating.h"
+#include "stack.h"
+
+/* Static function for working with an expression on the infix notation */
+
+static int getPriority(char ch) {
+	switch (ch) {
+	case SUB: return PRIOR_SUB;
+	case ADD: return PRIOR_ADD;
+	case MUL: return PRIOR_MUL;
+	case DIV: return PRIOR_DIV;
+	case POW: return PRIOR_POW;
+	case OP_BRACE: return PRIOR_OP_BR; // opening parethesis
+	case CL_BRACE: return PRIOR_CL_BR; // closing parethesis
+	default: return -1;
+	}
+}
 
 /* Function for working with an expression on the RPN */
 
@@ -10,32 +26,32 @@ int getOperand(char* num, char expression[], char** end)
 	unsigned counter = 0;
 	char* ptr = expression;
 
-	/* NULL pointer and \0 checking*/
+	/* NULL pointer checking*/
 	if (!ptr) return 0;
 
 	/* Spaces skipping before */
-	while (isspace(*ptr))
+	while (isspace((unsigned char)*ptr))
 		ptr++;
 
 	/* The unary minus checking */
 	int negative_flag = 0;
 	if (*ptr == SUB)
 	{
-		if (isdigit(*++ptr))   // if the next character is a digit
+		if (isdigit((unsigned char)*++ptr))   // if the next character is a digit
 			negative_flag = 1;
 		else
 			ptr--;
 	}
 
 	/* The return of the any not digit character */
-	if (!isdigit(*ptr))
+	if (!isdigit((unsigned char)*ptr))
 	{
 		*end = ++ptr;
 		return *(ptr - 1);
 	}
 
 	/* Making a float number and the delimiter processing */
-	while (isdigit(*ptr) || IS_DELIM(*ptr))
+	while (isdigit((unsigned char)*ptr) || IS_DELIM(*ptr))
 	{
 		if (*ptr == DELIM_COMMA)
 			*ptr = DELIM_DOT; // for atof()
@@ -70,113 +86,92 @@ double useOperator(double leftval, double rightval, char oper)
 	return result;
 }
 
-/* Function for working with an expression on the infix notation */
-
-int getPriority(char ch) {
-	switch (ch) {
-	case SUB: return PRIOR_SUB;
-	case ADD: return PRIOR_ADD;
-	case MUL: return PRIOR_MUL;
-	case DIV: return PRIOR_DIV;
-	case POW: return PRIOR_POW;
-	case OP_BRACE: return PRIOR_OP_BR; // opening parethesis
-	case CL_BRACE: return PRIOR_CL_BR; // closing parethesis
-	default: return -1;
-	}
-}
-
-int isOperator(char x)
-{
-	return (x == SUB || x == ADD || 
-			x == MUL || x == DIV || 
-			x == POW);
-}
-
-CalcErrors transformToRPN(char result[])
+CalcErrors transformToRPN(const char source[], char result[], int max_size)
 {
 	Stack* ops = createEmptyStack();
-	char temp_ch;
-	unsigned counter = 0;
+	char* ptr = source;
+	int counter = 0;
+	int unary_min = 0; // unary minus flag
 
-	while ((temp_ch = getchar())) 
-	{ 
-		/* Spaces skipping before */
-		while (isspace(temp_ch))  
-			temp_ch = getchar();
-
-		/* Ending the input, fully write the remaining contents of stack*/
-		if (temp_ch == EQ) 
-		{
-			while (ops->size)
-			{ 
-				result[counter++] = (char)pop(ops);
-				result[counter++] = SPACE;
-			}
-			result[counter++] = EQ;
-			result[counter] = '\0';
-			return NO_ERR;
+	for (ptr; *ptr; ptr++) 
+	{
+		/* Avoiding going beyond the array */
+		if (counter >= max_size) {
+			deleteStack(ops);
+			return INPUT_ERR;
 		}
 
-		/* Cheking the unary minus, and if it's not unary, return character after minus used to check back 
-		and process a minus as an operator*/
-		if (temp_ch == SUB)
-		{
-			temp_ch = getchar(); // read next symbol and if the next character is a digit
-			if (isdigit(temp_ch)) { 
-				if (temp_ch != '0') // to don't allow the '-0'
-					result[counter++] = SUB;
-			}
-			else {
-				ungetc(temp_ch, stdin);
-				temp_ch = SUB;
+		/* Space skipping */
+		while (isspace((unsigned char)*ptr))
+			ptr++;
+		
+		/* Unary minus checking */
+		if (*ptr == SUB)
+		{ 
+			if (*(ptr + 1) == '0') // prevent '-0'
+				ptr++;
+			if (unary_min || ptr == source) { // (ptr == source) => it is a array head
+				result[counter++] = SUB;
+				ptr++;
 			}
 		}
 
 		/* Making a number */
-		if (isdigit(temp_ch))
+		if (isdigit((unsigned char)*ptr))
 		{
-			while (isdigit(temp_ch) || IS_DELIM(temp_ch) )
-			{ 
-				result[counter++] = temp_ch;
-				temp_ch = getchar();
-			}	
-			ungetc(temp_ch, stdin); // return the extra character
+			while (isdigit((unsigned char)*ptr) || IS_DELIM(*ptr))
+				result[counter++] = *ptr++;
+			ptr--; // return the extra character
 			result[counter++] = SPACE;
+			unary_min = 0;
 		}
-
-		/* Else check the operator and push it to the stack */
-		else 
+		else if (IS_OPERATOR(*ptr))
 		{
-			if (isOperator(temp_ch)) 
+			unary_min = 1;
+			if (!ops->size) // if stack is empty (to avoid an error after pop)
+				push(ops, (double)(*ptr));
+			else
 			{
-				if (!ops->size) // if stack is empty (to avoid an error after pop)
-					push(ops, (double)temp_ch);
-				else 
-				{
-					if (PRIOR(temp_ch) <= PRIOR((char)peek(ops))) // > if priority of new operator is higher than operator 
-					{											  // in the top of stack, then the old operation will be
-						result[counter++] = (char)pop(ops);		  // display and new operator push in the stack < 
-						result[counter++] = SPACE;
-					}
-
-					push(ops, (double)temp_ch);
-				}
-			}
-			/* Operators inside parathesises processing */
-			else if (temp_ch == OP_BRACE)
-				push(ops, (double)temp_ch);
-			else if (temp_ch == CL_BRACE)  // if it's a closing parethesis, then it write all of operators before the
-			{							   // opening parethesis not including it
-				char tmp;
-				while ((tmp = (char)pop(ops)) != OP_BRACE) // until the opening parathesis
-				{
-					result[counter++] = tmp;
+				if (PRIOR(*ptr) <= PRIOR((char)peek(ops))) // > if priority of new operator is higher than operator 
+				{											  // in the top of stack, then the old operation will be
+					result[counter++] = (char)pop(ops);		  // display and new operator push in the stack < 
 					result[counter++] = SPACE;
 				}
+
+				push(ops, (double)(*ptr));
 			}
-			/* Any other symbols */
-			else  
-				return WRONGSYM_ERR;
-		}	
+		}
+		else if (*ptr == OP_BRACE) {
+			unary_min = 1;
+			push(ops, (double)(*ptr));
+		}
+		else if (*ptr == CL_BRACE)		// if it's a closing parethesis, then it write all of operators before the
+		{								// opening parethesis not including it
+			char tmp;
+			while ((tmp = (char)pop(ops)) != OP_BRACE) // until the opening parathesis
+			{
+				result[counter++] = tmp;
+				result[counter++] = SPACE;
+			}
+		}
+		else { // if it came across a unknown symbol
+			deleteStack(ops);
+			return INPUT_ERR;
+		}
+
 	}
+
+	/* Pull out remaining operators */
+	while (ops->size)
+	{
+		result[counter++] = (char)pop(ops);
+		result[counter++] = SPACE;
+	}
+	result[counter++] = EQ;
+	result[counter] = '\0';
+
+	deleteStack(ops);
+	return NO_ERR;
 }
+
+

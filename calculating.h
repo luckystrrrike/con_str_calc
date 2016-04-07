@@ -4,14 +4,14 @@
 typedef enum calcerr {
 	NO_ERR,
 	MATH_ERR,
-	WRONGSYM_ERR,
-	LACK_OPERAND,
-	END_CALC
+	INPUT_ERR,
+	END_CALC,
+	UNKNOWN_ERR
 } CalcErrors;
 
-#define MSG_WRONGSYM "ERROR! You entered the wrong symbol(s).\n"
-#define MSG_LACKOP	"ERROR! The input format is not correct. \n"
-#define MSG_MATH "ERROR! Math error! \n"
+#define MSG_INPUTERR "ERROR! The input format is not correct. Try again.\n"
+#define MSG_MATH	 "ERROR! Math error! Try again.\n"
+#define MSG_UNKN	 "UNKNOWN ERROR! Try again.\n"
 
 /* Operators, delimiters, other characters */
 #define VAL 1
@@ -23,6 +23,8 @@ typedef enum calcerr {
 #define POW '^'
 #define OP_BRACE '('
 #define CL_BRACE ')'
+
+#define IS_OPERATOR(x) ((x) == SUB || (x) == ADD || (x) == MUL || (x) == DIV || (x) == POW)
 
 #define DELIM_DOT '.'
 #define DELIM_COMMA ','
@@ -46,8 +48,6 @@ int		getOperand(char* num, char expression[], char** end);
 double	useOperator(double leftval, double rightval, char oper);
 
 /*transform the infix notation to the reverse Polish notation*/
-int			isOperator(char op);
-static int	getPriority(char op);
-CalcErrors	transformToRPN(char result[]); 
+CalcErrors	transformToRPN(const char source[], char result[], int max_size);
 
 #define NUM_LENGTH DBL_DIG // maximum length of number
