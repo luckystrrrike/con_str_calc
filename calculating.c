@@ -108,7 +108,7 @@ CalcErrors transformToRPN(const char source[], char result[], int max_size)
 		/* Unary minus checking */
 		if (*ptr == SUB)
 		{ 
-			if (*(ptr + 1) == '0') // prevent '-0'
+			if (*(ptr + 1) == '0' && !IS_DELIM(*(ptr+2))) // prevent '-0' but allow '-0.5' for example
 				ptr++;
 			if (unary_min || ptr == source) { // (ptr == source) => it is a array head
 				result[counter++] = SUB;
